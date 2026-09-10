@@ -1,62 +1,52 @@
 import React, { useState } from 'react';
-import { Shield, Search, Globe, GitBranch, AlertTriangle, Activity, Lock, Terminal, Sparkles } from 'lucide-react';
+import axios from 'axios';
+import { Shield, Search, Globe, GitBranch, AlertTriangle, Activity, Terminal, Sparkles, Loader2 } from 'lucide-react';
 import ResultsTable from './components/ResultsTable';
 
-// Mock scan telemetry for testing Phase 5 UI components
-const MOCK_RESULTS = [
-  {
-    type: 'AWS Access Key',
-    severity: 'CRITICAL',
-    source: 'https://raw.githubusercontent.com/org/repo/main/.env',
-    redactedPreview: 'AKIA••••••••MPLE',
-    description: 'AWS IAM Access Key ID exposed in root config environment file.',
-  },
-  {
-    type: 'Firebase Config',
-    severity: 'HIGH',
-    source: 'https://example-app.com/assets/index-bundle.js',
-    redactedPreview: 'AIza••••••••tUvW',
-    description: 'Public Web API Key with un-restricted domain origin policy.',
-  },
-  {
-    type: 'Exposed Server File',
-    severity: 'CRITICAL',
-    source: 'https://example-app.com/.env',
-    redactedPreview: 'DB_PASSWORD=••••••••',
-    description: 'HTTP 200 OK — Raw `.env` configuration file accessible directly from public web root.',
-  },
-  {
-    type: 'RSA Private Key',
-    severity: 'CRITICAL',
-    source: 'https://github.com/user/dev-scripts/blob/master/id_rsa',
-    redactedPreview: '----••••••••----',
-    description: 'Unencrypted 2048-bit RSA Private Key stored in git version control.',
-  },
-  {
-    type: 'Bearer Token',
-    severity: 'HIGH',
-    source: 'https://example-app.com/api/v1/logs',
-    redactedPreview: 'Bear••••••••sw5c',
-    description: 'JWT Authorization Bearer token leaked in cleartext server log endpoint.',
-  },
-];
+const API_BASE = 'http://localhost:5000';
 
 export default function App() {
   const [targetType, setTargetType] = useState('github'); // 'github' | 'web'
   const [targetValue, setTargetValue] = useState('');
   const [isScanning, setIsScanning] = useState(false);
-  const [scanResults, setScanResults] = useState(MOCK_RESULTS); // Populated with mock data for testing
+  const [scanResults, setScanResults] = useState([]);
+  const [scanMeta, setScanMeta] = useState(null);
+  const [scanError, setScanError] = useState(null);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!targetValue.trim()) return;
 
     setIsScanning(true);
-    
-    // Simulate active scan pass
-    setTimeout(() => {
+    setScanResults([]);
+    setScanMeta(null);
+    setScanError(null);
+
+    const endpoint =
+      targetType === 'github'
+        ? `${API_BASE}/api/scan/github`
+        : `${API_BASE}/api/scan/web`;
+
+    try {
+      const { data } = await axios.post(endpoint, { target: targetValue.trim() });
+
+      setScanResults(data.secrets || []);
+      setScanMeta({
+        scanType: data.scanType,
+        target: data.target,
+        scannedAt: data.scannedAt,
+        summary: data.summary,
+        totalRepos: data.totalRepos,
+        scriptBundlesFound: data.scriptBundlesFound,
+        probesRun: data.probesRun,
+      });
+    } catch (err) {
+      const message =
+        err.response?.data?.error || err.message || 'Scan request failed unexpectedly.';
+      setScanError(message);
+    } finally {
       setIsScanning(false);
-    }, 1200);
+    }
   };
 
   return (
@@ -102,14 +92,6 @@ export default function App() {
                 <p className="text-sm text-slate-400">Select scanning vector and enter target parameters</p>
               </div>
             </div>
-
-            <button
-              onClick={() => setScanResults(MOCK_RESULTS)}
-              className="text-xs font-mono text-cyan-400 hover:text-cyan-300 flex items-center space-x-1 bg-cyan-500/10 border border-cyan-500/20 px-3 py-1.5 rounded-md transition-colors"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Load Mock Telemetry</span>
-            </button>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -171,8 +153,8 @@ export default function App() {
                   >
                     {isScanning ? (
                       <>
-                        <Activity className="w-4 h-4 animate-spin" />
-                        <span>Probing...</span>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Scanning...</span>
                       </>
                     ) : (
                       <>
@@ -188,10 +170,64 @@ export default function App() {
           </form>
         </section>
 
-        {/* Scan Results Table & Slide-out Remediation Panel */}
-        <section>
-          <ResultsTable results={scanResults} />
-        </section>
+        {/* Scanning Spinner Overlay */}
+        {isScanning && (
+          <section className="bg-slate-900/60 border border-cyan-500/20 rounded-xl p-10 text-center space-y-4 animate-pulse">
+            <div className="w-16 h-16 rounded-full bg-cyan-500/10 border border-cyan-500/30 mx-auto flex items-center justify-center">
+              <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
+            </div>
+            <h3 className="text-md font-semibold text-slate-200">Active Scan in Progress</h3>
+            <p className="text-xs text-slate-400 font-mono max-w-md mx-auto">
+              {targetType === 'github'
+                ? `Fetching public repositories and scanning commit history for "${targetValue}"...`
+                : `Probing ${targetValue} — extracting script bundles and testing exposed paths...`}
+            </p>
+          </section>
+        )}
+
+        {/* Scan Error Display */}
+        {scanError && !isScanning && (
+          <section className="bg-rose-500/5 border border-rose-500/20 rounded-xl p-6 flex items-start space-x-4">
+            <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 flex-shrink-0">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-rose-300">Scan Failed</h3>
+              <p className="text-xs text-rose-400/80 font-mono mt-1">{scanError}</p>
+            </div>
+          </section>
+        )}
+
+        {/* Scan Metadata Summary Bar */}
+        {scanMeta && !isScanning && (
+          <section className="bg-slate-900/40 border border-slate-800 rounded-xl px-6 py-4 flex items-center justify-between text-xs font-mono">
+            <div className="flex items-center space-x-6 text-slate-400">
+              <span>Type: <span className="text-slate-200 font-semibold uppercase">{scanMeta.scanType}</span></span>
+              <span>Target: <span className="text-slate-200">{scanMeta.target}</span></span>
+              <span>Scanned: <span className="text-slate-200">{new Date(scanMeta.scannedAt).toLocaleString()}</span></span>
+            </div>
+            {scanMeta.summary && (
+              <div className="flex items-center space-x-3">
+                {scanMeta.summary.critical > 0 && (
+                  <span className="px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 font-bold">{scanMeta.summary.critical} CRITICAL</span>
+                )}
+                {scanMeta.summary.high > 0 && (
+                  <span className="px-2 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20 font-bold">{scanMeta.summary.high} HIGH</span>
+                )}
+                {scanMeta.summary.medium > 0 && (
+                  <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold">{scanMeta.summary.medium} MEDIUM</span>
+                )}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Scan Results Table & Remediation Panel */}
+        {!isScanning && (scanResults.length > 0 || scanMeta) && (
+          <section>
+            <ResultsTable results={scanResults} />
+          </section>
+        )}
 
       </main>
 
