@@ -1,7 +1,8 @@
 /**
  * TraceGuard Secret Engine
  * Regex-based scanner to detect leaked secrets in raw text payloads.
- * Returns structured match objects with type, source, and redacted previews.
+ * Returns structured match objects with type, source, redacted previews,
+ * and Shannon Entropy analysis for confidence classification.
  */
 
 const SECRET_PATTERNS = [
@@ -75,10 +76,66 @@ function redact(value) {
 }
 
 /**
+ * Calculate Shannon Entropy of a string.
+ * H(X) = -Σ P(xi) * log2(P(xi))
+ * Higher entropy indicates more randomness (likely a real secret).
+ * @param {string} str - Input string to analyze
+ * @returns {number} - Entropy score in bits per character
+ */
+function calculateEntropy(str) {
+  if (!str || str.length === 0) return 0;
+
+  // Count character frequencies
+  const freq = {};
+  for (const char of str) {
+    freq[char] = (freq[char] || 0) + 1;
+  }
+
+  const len = str.length;
+  let entropy = 0;
+
+  for (const char in freq) {
+    const probability = freq[char] / len;
+    if (probability > 0) {
+      entropy -= probability * Math.log2(probability);
+    }
+  }
+
+  return Math.round(entropy * 10000) / 10000; // Round to 4 decimal places
+}
+
+/**
+ * Determine if a string is hex-encoded.
+ * @param {string} str - Input string
+ * @returns {boolean} - True if string is purely hexadecimal
+ */
+function isHexString(str) {
+  return /^[0-9a-fA-F]+$/.test(str);
+}
+
+/**
+ * Classify a matched secret based on its Shannon Entropy score.
+ * - General strings: H(X) >= 4.5 → 'Verified High Entropy Secret'
+ * - Hex strings:     H(X) >= 3.2 → 'Verified High Entropy Secret'
+ * - Below threshold: → 'Potential Test Data'
+ * @param {string} value - The raw matched string
+ * @returns {{ entropyScore: number, entropyClassification: string }}
+ */
+function classifyByEntropy(value) {
+  const entropyScore = calculateEntropy(value);
+  const threshold = isHexString(value) ? 3.2 : 4.5;
+  const entropyClassification =
+    entropyScore >= threshold ? 'Verified High Entropy Secret' : 'Potential Test Data';
+
+  return { entropyScore, entropyClassification };
+}
+
+/**
  * Scan a raw text payload for secrets.
+ * Each match includes Shannon Entropy scoring and confidence classification.
  * @param {string} text - Raw text content to scan
  * @param {string} source - Source identifier (file path, URL, repo name)
- * @returns {Array<Object>} - Array of match objects
+ * @returns {Array<Object>} - Array of match objects with entropy analysis
  */
 function scanText(text, source) {
   if (!text || typeof text !== 'string') return [];
@@ -100,6 +157,9 @@ function scanText(text, source) {
       const lineEnd = text.indexOf('\n', match.index);
       const line = text.slice(lineStart, lineEnd === -1 ? undefined : lineEnd).trim();
 
+      // Shannon Entropy analysis
+      const { entropyScore, entropyClassification } = classifyByEntropy(rawValue);
+
       matches.push({
         type: pattern.type,
         description: pattern.description,
@@ -108,6 +168,8 @@ function scanText(text, source) {
         lineContext: redact(line),
         charIndex: match.index,
         severity: getSeverity(pattern.type),
+        entropyScore,
+        entropyClassification,
       });
     }
   }
@@ -152,4 +214,4 @@ function scanPayloads(payloads) {
   return allMatches;
 }
 
-module.exports = { scanText, scanPayloads, redact, SECRET_PATTERNS };
+module.exports = { scanText, scanPayloads, redact, calculateEntropy, classifyByEntropy, SECRET_PATTERNS };
