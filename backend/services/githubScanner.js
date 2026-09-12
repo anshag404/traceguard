@@ -87,6 +87,60 @@ async function fetchRecentCommits(username) {
 }
 
 /**
+ * Deep Git Commit Diff Scanning: Query a repository's last 15 commits and extract patch blocks.
+ * Requires querying each commit individually via GET /repos/{owner}/{repo}/commits/{ref}
+ * to retrieve the file diffs/patches (which listCommits omits).
+ * @param {string} username - GitHub username (owner)
+ * @param {string} repoName - Repository name
+ * @returns {Promise<Array>} - Array of commit objects with full patch blocks
+ */
+async function fetchDeepCommitDiffs(username, repoName) {
+  const octokit = createOctokit();
+  
+  try {
+    // 1. Get the list of the last 15 commits
+    const { data: commitList } = await octokit.repos.listCommits({
+      owner: username,
+      repo: repoName,
+      per_page: 15,
+    });
+
+    const detailedCommits = [];
+
+    // 2. Fetch each commit individually to get the file patches
+    for (const shallowCommit of commitList) {
+      try {
+        const { data: fullCommit } = await octokit.repos.getCommit({
+          owner: username,
+          repo: repoName,
+          ref: shallowCommit.sha,
+        });
+
+        const patchData = fullCommit.files 
+          ? fullCommit.files.map(f => f.patch).filter(Boolean).join('\n') 
+          : '';
+
+        detailedCommits.push({
+          sha: fullCommit.sha,
+          message: fullCommit.commit.message,
+          author: fullCommit.commit.author.name,
+          date: fullCommit.commit.author.date,
+          url: fullCommit.html_url,
+          rawPatch: patchData, // Extracted patch block
+        });
+      } catch (err) {
+        console.error(`[TraceGuard] Failed to fetch deep diff for ${shallowCommit.sha}: ${err.message}`);
+      }
+    }
+
+    return detailedCommits;
+  } catch (err) {
+    console.error(`[TraceGuard] Failed to fetch commit list for ${repoName}: ${err.message}`);
+    return [];
+  }
+}
+
+/**
  * Full GitHub scan: repos + commits with raw text payloads.
  * @param {string} username - GitHub username to scan
  * @returns {Promise<Object>} - Complete scan results
@@ -104,4 +158,4 @@ async function scanGitHub(username) {
   };
 }
 
-module.exports = { fetchPublicRepos, fetchRecentCommits, scanGitHub };
+module.exports = { fetchPublicRepos, fetchRecentCommits, fetchDeepCommitDiffs, scanGitHub };
