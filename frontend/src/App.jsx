@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { Shield, Search, Globe, GitBranch, AlertTriangle, Activity, Terminal, Sparkles, Loader2 } from 'lucide-react';
 import ResultsTable from './components/ResultsTable';
+import ExportReport from './components/ExportReport';
 
 const API_BASE = 'http://localhost:5000';
 
@@ -219,6 +220,9 @@ export default function App() {
                 )}
               </div>
             )}
+            <div>
+              <ExportReport scanMeta={scanMeta} results={scanResults} />
+            </div>
           </section>
         )}
 
