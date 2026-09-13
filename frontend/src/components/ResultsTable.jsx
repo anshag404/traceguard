@@ -71,6 +71,7 @@ export default function ResultsTable({ results = [] }) {
             <tr className="border-b border-slate-800 bg-slate-950/60 text-xs font-mono text-slate-400 uppercase tracking-wider">
               <th className="py-3.5 px-6 font-semibold">Severity</th>
               <th className="py-3.5 px-4 font-semibold">Secret Type</th>
+              <th className="py-3.5 px-4 font-semibold">Entropy</th>
               <th className="py-3.5 px-4 font-semibold">Target Source</th>
               <th className="py-3.5 px-4 font-semibold">Redacted Match</th>
               <th className="py-3.5 px-6 text-right font-semibold">Action</th>
@@ -96,11 +97,33 @@ export default function ResultsTable({ results = [] }) {
                   </div>
                 </td>
 
+                {/* Entropy Score */}
+                <td className="py-4 px-4 whitespace-nowrap">
+                  {item.entropyScore ? (
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-medium border ${
+                      item.entropyClassification === 'Verified High Entropy Secret'
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                        : 'bg-slate-500/10 text-slate-400 border-slate-500/30'
+                    }`}>
+                      H: {item.entropyScore.toFixed(4)}
+                    </span>
+                  ) : (
+                    <span className="text-slate-500 font-mono">N/A</span>
+                  )}
+                </td>
+
                 {/* Target Source File / URL */}
                 <td className="py-4 px-4 max-w-xs truncate font-mono text-slate-300" title={item.source}>
-                  <div className="flex items-center space-x-1.5">
-                    <FileCode className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-                    <span className="truncate">{item.source}</span>
+                  <div className="flex flex-col space-y-1">
+                    <div className="flex items-center space-x-1.5">
+                      <FileCode className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                      <span className="truncate">{item.source.replace(' (Historical Leak)', '')}</span>
+                    </div>
+                    {item.source && item.source.includes('(Historical Leak)') && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 w-max">
+                        Historical Leak
+                      </span>
+                    )}
                   </div>
                 </td>
 
