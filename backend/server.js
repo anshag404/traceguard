@@ -204,6 +204,32 @@ app.post('/api/scan/web', async (req, res) => {
   }
 });
 
+// ─── Raw Text Scan Endpoint ───────────────────────────────────────────────────
+app.post('/api/scan/text', async (req, res) => {
+  const { text, source } = req.body;
+
+  if (!text || typeof text !== 'string') {
+    return res.status(400).json({ error: 'Missing or invalid "text" in request body.' });
+  }
+
+  try {
+    const scanSource = source || 'Unknown Extension Context';
+    const payloads = [{ text, source: scanSource }];
+    
+    const secrets = scanPayloads(payloads);
+
+    res.status(200).json({
+      scanType: 'text',
+      target: scanSource,
+      scannedAt: new Date().toISOString(),
+      secrets,
+    });
+  } catch (err) {
+    console.error(`[TraceGuard] Text scan error: ${err.message}`);
+    res.status(500).json({ error: `Text scan failed: ${err.message}` });
+  }
+});
+
 // Start the server
 app.listen(PORT, () => {
   console.log(`TraceGuard Server is running on port ${PORT}`);

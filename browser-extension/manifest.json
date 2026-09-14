@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "TraceGuard Real-Time Analyzer",
+  "version": "1.0.0",
+  "description": "Injects TraceGuard's heuristic OSINT scanning directly into the browser to detect exposed secrets in real-time.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "TraceGuard Scanner"
+  },
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://localhost:5000/*",
+    "https://*/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    }
+  ]
+}
