@@ -7,11 +7,24 @@
 
 # 🛡️ TraceGuard
 
-**Automated OSINT & Secret Scanning Platform**
+**Automated OSINT, Secret Scanning & DevSecOps Platform**
 
-TraceGuard is a full-stack security auditing tool that combines GitHub repository intelligence gathering, web application reconnaissance, and regex-based secret detection into a unified scanning platform with an interactive threat remediation dashboard.
+TraceGuard is a full-stack security auditing tool that combines GitHub repository intelligence gathering, deep commit history analysis, web application reconnaissance, passive subdomain enumeration, and regex-based secret detection into a unified scanning platform.
+
+With features like Shannon Entropy analysis, PDF Security Advisory generation, a Real-Time OSINT Chrome Extension, and a local Pre-Commit Hook, TraceGuard scales from an interactive dashboard to a proactive CI/CD developer tool.
 
 > ⚠️ **This tool is intended strictly for authorized security auditing and defensive posture management.** See the [Ethical Usage Disclaimer](#-ethical-usage-disclaimer) below.
+
+---
+
+## ✨ Enterprise Features
+
+- **Shannon Entropy Analysis**: Advanced cryptographic entropy calculations to filter out test data and isolate true, verified high-entropy secrets.
+- **Deep Git Commit History Scanning**: Extends the GitHub API scanner to retrieve and diff historical commits, hunting down deleted leaks.
+- **Passive Subdomain Enumeration**: Integrates with `crt.sh` Certificate Transparency logs to dynamically expand the web target's attack surface.
+- **Automated PDF Advisory Generation**: Instantly generate structured executive summaries and mitigation playbooks directly from the dashboard using `jsPDF`.
+- **Real-Time OSINT Browser Extension**: A Chrome extension that injects TraceGuard's heuristic scanner directly into the browser, alerting analysts to exposed secrets in real-time.
+- **Proactive Pre-Commit Git Hook**: A local developer CLI tool that automatically scans staged files and rejects commits if secrets are detected.
 
 ---
 
@@ -23,7 +36,7 @@ TraceGuard is a full-stack security auditing tool that combines GitHub repositor
 │                                                                 │
 │  ┌──────────────┐  ┌──────────────────┐  ┌───────────────────┐  │
 │  │ Target Config │  │  ResultsTable    │  │ RemediationPanel  │  │
-│  │    Form       │  │  (Threat Grid)   │  │ (Slide-out Drawer)│  │
+│  │    Form       │  │ (Threat Grid)    │  │ & PDF Generator   │  │
 │  └──────┬───────┘  └────────▲─────────┘  └────────▲──────────┘  │
 │         │                   │                     │              │
 │         │          Axios POST Request      Row Click Event       │
@@ -42,29 +55,26 @@ TraceGuard is a full-stack security auditing tool that combines GitHub repositor
 │  │                    server.js (API Router)                  │  │
 │  │                                                            │  │
 │  │   POST /api/scan/github ──► githubScanner.js ─┐            │  │
-│  │   POST /api/scan/web ─────► webScanner.js ────┤            │  │
-│  │   GET  /api/health                            │            │  │
-│  │                                               ▼            │  │
+│  │   POST /api/scan/web ─────► subdomainScanner  ├──► web     │  │
+│  │   POST /api/scan/text ────┐                   │            │  │
+│  │                           ▼                   ▼            │  │
 │  │                                      secretEngine.js       │  │
-│  │                                     (Regex Heuristics)     │  │
+│  │                                 (Regex + Shannon Entropy)  │  │
 │  │                                           │                │  │
 │  │                                           ▼                │  │
 │  │                                   Unified JSON Report      │  │
 │  └────────────────────────────────────────────────────────────┘  │
+├─────────────────────────────┬───────────────────────────────────┤
+│                             │                                   │
+│  ┌───────────────────────┐  │  ┌─────────────────────────────┐  │
+│  │ Browser Extension     ├──┘  │ Pre-Commit CLI Hook         │  │
+│  │ (Live DOM scraping)   │     │ (Local Staged File scanner) │  │
+│  └───────────────────────┘     └─────────────┬───────────────┘  │
+│                                              │                  │
+│                                              ▼                  │
+│                                     Local secretEngine logic    │
 └─────────────────────────────────────────────────────────────────┘
 ```
-
-### Component Breakdown
-
-| Layer | Component | Technology | Purpose |
-|-------|-----------|------------|---------|
-| **Frontend** | `App.jsx` | React 19, Vite | Target config form, state management, API orchestration |
-| **Frontend** | `ResultsTable.jsx` | React, Tailwind CSS | Threat telemetry grid with severity badges |
-| **Frontend** | `RemediationPanel.jsx` | React, Tailwind CSS | Slide-out drawer with type-specific mitigation playbooks |
-| **Backend** | `server.js` | Express 5, Helmet, CORS | API routing, middleware security headers |
-| **Backend** | `githubScanner.js` | Octokit REST | GitHub OSINT — public repos, commit history extraction |
-| **Backend** | `webScanner.js` | Axios, Cheerio | Web recon — script bundle extraction, exposed file probing |
-| **Backend** | `secretEngine.js` | Native RegExp | Heuristic pattern matching across 10 secret types |
 
 ---
 
@@ -103,13 +113,6 @@ Start the backend server:
 node server.js
 ```
 
-Verify the server is running:
-
-```bash
-curl http://localhost:5000/api/health
-# → { "status": "ok", "message": "TraceGuard Backend is healthy" }
-```
-
 ### 3. Frontend Setup
 
 ```bash
@@ -120,13 +123,21 @@ npm run dev -- --port 3000
 
 Open **http://localhost:3000** in your browser.
 
-### 4. Run Test Suites
+### 4. CI/CD Pre-Commit Hook Setup (DevSecOps)
+
+To protect your local environment from committing secrets:
 
 ```bash
-# From the backend/ directory
-node tests/testScanners.js       # GitHub + Web scanner tests
-node tests/testSecretEngine.js   # Secret engine regex tests (8 test cases)
+node scripts/install-hook.js
 ```
+*Now, any `git commit` containing high-entropy secrets will be immediately aborted!*
+
+### 5. Chrome Extension Setup
+
+1. Open Google Chrome and go to `chrome://extensions/`.
+2. Enable **Developer mode**.
+3. Click **Load unpacked** and select the `traceguard/browser-extension` folder.
+4. Browse any public site (e.g., GitHub, Pastebin) while the TraceGuard Backend is running.
 
 ---
 
@@ -156,66 +167,7 @@ TraceGuard's regex heuristic engine scans for the following credential and confi
 | `/.env` | 🔴 CRITICAL | Database passwords, API keys, JWT secrets, SMTP credentials |
 | `/.git/config` | 🔴 CRITICAL | Repository remote URLs, internal infrastructure hostnames |
 | `/config.json` | 🟠 HIGH | Application configuration, service account credentials |
-| `/actuator/env` | 🔴 CRITICAL | Spring Boot environment — database URIs, cloud provider keys, internal service mesh endpoints |
-
-> The `/actuator/env` probe specifically targets **Spring Boot Actuator** misconfigurations, a common attack surface in Java microservice deployments where environment variables containing secrets are exposed via unsecured management endpoints.
-
----
-
-## 🛠️ API Reference
-
-### `GET /api/health`
-
-Health check endpoint.
-
-**Response:**
-```json
-{ "status": "ok", "message": "TraceGuard Backend is healthy" }
-```
-
-### `POST /api/scan/github`
-
-Scan a GitHub user's public repositories and commit history for leaked secrets.
-
-**Request Body:**
-```json
-{ "target": "octocat" }
-```
-
-**Response:**
-```json
-{
-  "scanType": "github",
-  "target": "octocat",
-  "scannedAt": "2026-09-10T18:05:30.000Z",
-  "totalRepos": 8,
-  "totalCommitsScanned": 26,
-  "secrets": [ ... ],
-  "summary": { "critical": 0, "high": 0, "medium": 0, "low": 0 }
-}
-```
-
-### `POST /api/scan/web`
-
-Scan a web application for client-side secret leaks and server-side misconfigurations.
-
-**Request Body:**
-```json
-{ "target": "https://example.com" }
-```
-
-**Response:**
-```json
-{
-  "scanType": "web",
-  "target": "https://example.com",
-  "scannedAt": "2026-09-10T18:05:30.000Z",
-  "scriptBundlesFound": 3,
-  "probesRun": 4,
-  "secrets": [ ... ],
-  "summary": { "critical": 1, "high": 2, "medium": 0, "low": 0 }
-}
-```
+| `/actuator/env` | 🔴 CRITICAL | Spring Boot environment — database URIs, cloud provider keys |
 
 ---
 
@@ -226,27 +178,25 @@ traceguard/
 ├── backend/
 │   ├── server.js                  # Express API server & route definitions
 │   ├── services/
-│   │   ├── githubScanner.js       # GitHub OSINT via Octokit REST API
+│   │   ├── githubScanner.js       # GitHub OSINT via Octokit REST API (including deep diffs)
+│   │   ├── subdomainScanner.js    # Passive crt.sh Subdomain Enumeration
 │   │   ├── webScanner.js          # Web recon: script extraction + path probing
-│   │   └── secretEngine.js        # Regex heuristic secret detection engine
-│   ├── tests/
-│   │   ├── testScanners.js        # Integration tests for scanner services
-│   │   └── testSecretEngine.js    # Unit tests for regex engine (8 cases)
-│   ├── package.json
+│   │   └── secretEngine.js        # Regex & Shannon Entropy detection engine
+│   ├── tests/                     # Integration and Unit tests
 │   └── .env                       # (Optional) GitHub token config
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx                # Main app: target config, API calls, state
+│   │   ├── App.jsx                # Main app state
 │   │   ├── components/
-│   │   │   ├── ResultsTable.jsx   # Threat telemetry table with severity badges
-│   │   │   └── RemediationPanel.jsx  # Slide-out remediation playbook drawer
-│   │   ├── index.css              # Tailwind CSS dark theme setup
-│   │   └── main.jsx               # React entry point
-│   ├── vite.config.js             # Vite + Tailwind plugin configuration
-│   └── package.json
+│   │   │   ├── ResultsTable.jsx   # Threat telemetry table
+│   │   │   ├── RemediationPanel.jsx
+│   │   │   └── ExportReport.jsx   # jsPDF Security Advisory Generator
+│   └── vite.config.js
 │
-├── .gitignore
+├── browser-extension/             # Real-Time OSINT Chrome Extension (Manifest V3)
+├── cli/                           # Pre-Commit Node CLI
+├── scripts/                       # Automated Install scripts
 └── README.md
 ```
 
