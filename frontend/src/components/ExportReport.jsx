@@ -1,6 +1,6 @@
 import React from 'react';
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { FileDown } from 'lucide-react';
 
 export default function ExportReport({ scanMeta, results }) {
@@ -46,7 +46,7 @@ export default function ExportReport({ scanMeta, results }) {
       summaryData.push(['LOW Severity', scanMeta.summary.low.toString()]);
     }
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: 58,
       head: [['Metric', 'Value']],
       body: summaryData,
@@ -82,7 +82,7 @@ export default function ExportReport({ scanMeta, results }) {
       getRemediation(r.type || '')
     ]);
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: finalY + 22,
       head: [tableCols],
       body: tableRows,

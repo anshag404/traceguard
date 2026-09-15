@@ -105,7 +105,7 @@ export default function RemediationPanel({ match, onClose }) {
       <div className="w-full max-w-xl bg-slate-900 border-l border-slate-800 shadow-2xl flex flex-col h-full overflow-y-auto animate-in slide-in-from-right duration-300">
         
         {/* Panel Header */}
-        <div className="p-6 border-b border-slate-800 flex items-start justify-between bg-slate-950/50 sticky top-0 z-10">
+        <div className="p-6 border-b border-slate-800 flex items-start justify-between bg-slate-950 sticky top-0 z-10">
           <div className="flex items-center space-x-3">
             <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400">
               <ShieldAlert className="w-6 h-6" />
@@ -189,7 +189,7 @@ export default function RemediationPanel({ match, onClose }) {
         </div>
 
         {/* Panel Footer */}
-        <div className="p-4 border-t border-slate-800 bg-slate-950/80 sticky bottom-0 flex justify-between items-center text-xs">
+        <div className="p-4 border-t border-slate-800 bg-slate-950 sticky bottom-0 flex justify-between items-center text-xs">
           <span className="text-slate-500 font-mono">TraceGuard Security Engine</span>
           <button
             onClick={onClose}
